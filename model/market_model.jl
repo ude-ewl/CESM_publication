@@ -71,7 +71,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     if PARAMETER_SETTINGS.AC_LOSSES == "ACTIVE"
         # Electricity losses at node n during TIME step t (in MW)
         @variable(model, 0 <= p_loss_nodal[SETS.NODES,SETS.TIME] )
-        @variable(model, 0 <= p_loss_line_abs[m=SETS.BRANCHES,t=SETS.TIME] <= (BRANCHES.LOSS_FACTOR_m2a[m] * BRANCHES.PMAX[m] + BRANCHES.LOSS_FACTOR_b2a[m]) * 2 )
+        @variable(model, 0 <= p_loss_line_abs[m=SETS.BRANCHES,t=SETS.TIME] <= (BRANCHES.LOSS_FACTOR_m[m] * BRANCHES.PMAX[m]) * 2 )
     end
 
     #-- HVDC
@@ -288,7 +288,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
         #println(BOOLEAN_CONSIDER_BRANCH)
         println("relevant branches for constraints: " * string(sum(BOOLEAN_CONSIDER_BRANCH)) * " out of total amount of: " * string(length(BOOLEAN_CONSIDER_BRANCH)))
         # Max. line capacity (positive)
-        @constraint(model, cons_line_max_capacity[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * p_branch[m,t] <= BRANCHES.PMAX[m])
+        @constraint(model, cons_line_max_capacity[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * p_branch_abs[m,t] <= BRANCHES.PMAX[m])
         # # Max. line capacity 2 (negative)
         # @constraint(model, cons_line_max_capacity_2[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * -p_branch[m,t] <= BRANCHES.PMAX[m])
     end
@@ -469,14 +469,15 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
 
     #-- Heat pumps
     # If timeseries model is selected for flexibilities
-    if PARAMETER_SETTINGS.FLEX_MARKET.HP == "TIMESERIES"
+    if PARAMETER_SETTINGS.FLEX_MARKET.HP == "TS"
         # Assignment: heat pump to electricity node
         #add_constraint_sparse_2D(model, ASSIGNMENTS.A_HP, HEATPUMPS.ELEC_TIMESERIES', "==", p_hp_node, "cons_heatpump_assignment");
-            #@constraint(model, cons_heatpump_assignment[n=SETS.NODES, t=SETS.TIME], p_hp_node[n,t] == ASSIGNMENTS.A_HP[n,:]' * HEATPUMPS.ELEC_TIMESERIES[t,:])
-            NODES_RELEVANT =  SETS.NODES[in.(collect(SETS.NODES), (collect(1:size(ASSIGNMENTS.A_HP,1)),))]
-            NODES_NOT_RELEVANT =  SETS.NODES[.!(in.(collect(SETS.NODES), (collect(1:size(ASSIGNMENTS.A_HP,1)),)))]  
-            @constraint(model, cons_heatpump_assignment[n=NODES_RELEVANT, t=SETS.TIME], p_hp_node[n,t] == ASSIGNMENTS.A_HP[n,:]' * HEATPUMPS.ELEC_TIMESERIES[t,:])
-            @constraint(model, cons_heatpump_assignment_zero[n=NODES_NOT_RELEVANT, t=SETS.TIME], p_hp_node[n,t] == 0)
+        # @constraint(model, cons_heatpump_assignment[n=SETS.NODES, t=SETS.TIME], p_hp_node[n,t] == ASSIGNMENTS.A_HP[n,:]' * HEATPUMPS.ELEC_TIMESERIES[t,:])
+        NODES_RELEVANT =  SETS.NODES[in.(collect(SETS.NODES), (collect(1:size(ASSIGNMENTS.A_HP,1)),))]
+        NODES_NOT_RELEVANT =  SETS.NODES[.!(in.(collect(SETS.NODES), (collect(1:size(ASSIGNMENTS.A_HP,1)),)))]  
+        @constraint(model, cons_heatpump_assignment[n=NODES_RELEVANT, t=SETS.TIME], p_hp_node[n,t] == ASSIGNMENTS.A_HP[n,:]' * HEATPUMPS.ELEC_TIMESERIES[t,:])
+        @constraint(model, cons_heatpump_assignment_zero[n=NODES_NOT_RELEVANT, t=SETS.TIME], p_hp_node[n,t] == 0)
+        @expression(model, expression_hp_final_filling_level, 0)
      
     # If detailed model is selected for flexibilities
     elseif PARAMETER_SETTINGS.FLEX_MARKET.HP == "Flex"
@@ -484,7 +485,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
         @constraint(model, cons_hp_and_he[s=SETS.HPS, t=SETS.TIME], p_hp_and_he_unit[s,t] == p_hp_unit[s,t] + p_hp_he_unit[s,t] )
         # Assignment: heat pump to electricity node
         add_constraint_sparse_2D(model, ASSIGNMENTS.A_HP, p_hp_and_he_unit, "==", p_hp_node, "cons_heatpump_elecnode_assignment");
-        #@constraint(model, cons_heatpump_elecnode_assignment[n=SETS.NODES, t=SETS.TIME], p_hp_node[n,t] == ASSIGNMENTS.A_HP[n,:]' * (p_hp_unit[:,t] + p_hp_he_unit[:,t]))
+        # @constraint(model, cons_heatpump_elecnode_assignment[n=SETS.NODES, t=SETS.TIME], p_hp_node[n,t] == ASSIGNMENTS.A_HP[n,:]' * (p_hp_unit[:,t] + p_hp_he_unit[:,t]))
         # Assignment: heat demand timeseries to heat pump
         @constraint(model, cons_heatpump_heatdemand_assignment[s=SETS.HPS, t=SETS.TIME], q_hp_d[s,t] == HEATPUMPS.HEAT_TIMESERIES[t,s] - hp_heat_slack[s,t])
         # Max. power heat pump
@@ -500,8 +501,10 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
         # Initial filling level
         @constraint(model, cons_heatpump_heatstorage_initial_filling_level[s=SETS.HPS, t=[(SETS.TIME[begin]-1)]],
             q_hp_hs[s,t]*(1-IS_FIRST_PERIOD) == HP_Q_0[s]*(1-IS_FIRST_PERIOD))
-        # max filling level
+        # Max. filling level
         @constraint(model, cons_heatpump_heatstorage_max_capacity[s=SETS.HPS, t=(SETS.TIME[begin]-1):SETS.TIME[end]], q_hp_hs[s,t] <= HEATPUMPS.Q_MAX[s])
+        # Final filling level value
+        @expression(model, expression_hp_final_filling_level, sum(HEATPUMPS.PENALTY_LAST_TIMESTEP * q_hp_hs[s,end] for s in SETS.HPS))
     end
 
     #-- Storage units
@@ -521,7 +524,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     @constraint(model, cons_storages_filling_level[s=SETS.STORS, t=SETS.TIME], e_s[s,t] == e_s[s,t-1] + (p_ch[s,t]* STORAGES.EFF_CH[s] - p_dis[s,t]/STORAGES.EFF_DIS[s])
     - (e_s[s,t] + e_s[s,t-1])/2 * STORAGES.SELF_DIS_RATIO[s])
     # Circle constraint
-    @constraint(model, cons_storages_circle[s=SETS.STORS], e_s[s,SETS.TIME[end]] >= e_s[s,(SETS.TIME[begin]-1)])
+    @constraint(model, cons_storages_circle[s=SETS.STORS], e_s[s,SETS.TIME[end]]*IS_FIRST_PERIOD >= e_s[s,(SETS.TIME[begin]-1)]*IS_FIRST_PERIOD)
     
 
     #-- Electric Mobility
@@ -565,14 +568,19 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
         + sum(p_chp_unit_startup[k,t]*COMBINEDHEATPOWERS.START_UP_COSTS[k] for k in SETS.CHPS, t in (SETS.TIME[begin]+1):SETS.TIME[end])
         # Power to gas slack
         + sum(p_ptg_slack[t] * PTG.HYDROGEN_PRICE[1] for t in SETS.TIME)
-        # Slacks
         
+        # Expression for investment decisions
         + expression_invest
         
+        # Slacks
         + 99999999 * sum(q_chp_region_slack[r,t] for r in SETS.HEATREGIONS, t in SETS.TIME)
         + 99999999 * sum(p_slack_pos[n,t] for n in SETS.NODES, t in SETS.TIME)
         + 99999999 * sum(p_slack_neg[n,t] for n in SETS.NODES, t in SETS.TIME)
         + 99999999 * sum(hp_heat_slack[s,t] for s in SETS.HPS, t in SETS.TIME)
+
+        # Assign value PENALTY_LAST_TIMESTEP to filling level of last timestep
+        - expression_hp_final_filling_level
+        - sum(STORAGES.PENALTY_LAST_TIMESTEP * e_s[s,end] for s in SETS.STORS)
     )
 
     println("---\n", now(), " : market model built has ", num_variables(model), " variables")

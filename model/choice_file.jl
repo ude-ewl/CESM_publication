@@ -54,7 +54,9 @@ function input_parameter_settings()
                             STOR="Flex",
                             CHP="EC_greater_10MW", # "EC_greater_10MW"
                             PTG="Flex",
-                            PTH="Flex")
+                            PTH="Flex"),
+            # Penalty for last timestep to avoid storage emptying
+            PENALTY_LAST_TIMESTEP = 5, # EUR/MWh
 
         )
     return PARAMETER_SETTINGS

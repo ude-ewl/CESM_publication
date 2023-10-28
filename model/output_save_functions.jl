@@ -856,8 +856,9 @@ end
 function save_multiple_jld2(DATA, NAME)
     timestring = Dates.format(now(), "yyyy_mm_dd_HH_MM_SS")
     for ct_file in NAME
+        idx = findall(x -> x == ct_file, NAME)
         file_path = abspath(joinpath(pwd(), "../results/") * timestring * " - " * ct_file * ".jld2")
-        save_object(file_path,DATA)
+        save_object(file_path,DATA[idx])
     end
     return nothing
 end
