@@ -22,6 +22,10 @@ function input_parameter_settings()
             FLEXIBILITY_STORAGE_VOTLAGE_LEVELS = [1,2,3,4,5],
             # HVDC Losses
             HVDC_LOSSES = "NOT ACTIVE", # "ACTIVE", or "NOT ACTIVE",
+            # AC Losses
+            AC_LOSSES = "NOT ACTIVE", # "ACTIVE", or "NOT ACTIVE",
+            # TRANSFORMER_RESTRICTIONS
+            TRANSFORMER_RESTRICTIONS = "NOT ACTIVE", # "ACTIVE", or "NOT ACTIVE",
             # LINE_RESTRICTIONS
             LINE_RESTRICTIONS_VOLTAGE = 0, # exclude line restrictions for lines lower than this voltage level, e.g. 0 means that none are excluded (the voltage level written here is the least voltage level included)
             # CESM  /

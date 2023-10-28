@@ -64,8 +64,15 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     #-- Power flow
     # Power flow across BRANCH m ∈ M during SETS.TIME step t (in MW)
     @variable(model, p_branch[SETS.BRANCHES,SETS.TIME])
+    # Absolute value of power flow across BRANCH m ∈ M during SETS.TIME step t (in MW)
+    @variable(model, 0 <= p_branch_abs[SETS.BRANCHES,SETS.TIME] )
     # voltage angle delta_lf
     @variable(model, delta_lf[SETS.NODES,SETS.TIME])
+    if PARAMETER_SETTINGS.AC_LOSSES == "ACTIVE"
+        # Electricity losses at node n during TIME step t (in MW)
+        @variable(model, 0 <= p_loss_nodal[SETS.NODES,SETS.TIME] )
+        @variable(model, 0 <= p_loss_line_abs[m=SETS.BRANCHES,t=SETS.TIME] <= (BRANCHES.LOSS_FACTOR_m2a[m] * BRANCHES.PMAX[m] + BRANCHES.LOSS_FACTOR_b2a[m]) * 2 )
+    end
 
     #-- HVDC
     # HVDC power exchange at designated node
@@ -227,11 +234,37 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
 
     #--- Optimization: Constraint definitions
 
+    if PARAMETER_SETTINGS.MODEL_TYPE == "CESM" # consider line restrictions if CESM (nodal) setup, when zonal+RD, do NOT use line restrictions
+        # Get absolute power flow across branches
+        @constraint(model, cons_line_losses_abs_1[m=SETS.BRANCHES, t=SETS.TIME], p_branch_abs[m,t] >= p_branch[m,t] )
+        @constraint(model, cons_line_losses_abs_2[m=SETS.BRANCHES, t=SETS.TIME], p_branch_abs[m,t] >= -p_branch[m,t] )
+    end
+    #-- Losses
+    if PARAMETER_SETTINGS.AC_LOSSES == "ACTIVE" && PARAMETER_SETTINGS.MODEL_TYPE == "CESM"
+        # Do not consider losses in case of a zonal run
+        @constraint(model, cons_line_losses[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] == BRANCHES.LOSS_FACTOR_m[m] * p_branch_abs[m,t] )
+        # # # @constraint(model, cons_line_losses_1[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m0[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b0[m] )
+        # # @constraint(model, cons_line_losses_1[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m1[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b1[m] )
+        # # @constraint(model, cons_line_losses_2[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m2[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b2[m] )
+        # # @constraint(model, cons_line_losses_3[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m3[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b3[m] )
+        # # @constraint(model, cons_line_losses_4[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m4[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b4[m] )
+        # @constraint(model, cons_line_losses_1[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m1a[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b1a[m] )
+        # @constraint(model, cons_line_losses_2[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR_m2a[m] * p_branch_abs[m,t] + BRANCHES.LOSS_FACTOR_b2a[m] )
+        # # # @constraint(model, cons_line_losses_abs_1[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= BRANCHES.LOSS_FACTOR[m] .* p_branch[m,t] )
+        # # # @constraint(model, cons_line_losses_abs_2[m=SETS.BRANCHES, t=SETS.TIME], p_loss_line_abs[m,t] >= -BRANCHES.LOSS_FACTOR[m] .* p_branch[m,t] )
+        @constraint(model, cons_line_losses_nodal[n=SETS.NODES, t=SETS.TIME], p_loss_nodal[n,t] == ((BRANCHES.ASSIGNMENT_FROM[n,:] + 
+            BRANCHES.ASSIGNMENT_TO[n,:])./2)' * p_loss_line_abs[:,t] )
+        @expression(model, expression_line_losses_nodal[n=SETS.NODES, t=SETS.TIME], p_loss_nodal[n,t] )
+        # @expression(model, expression_line_losses_nodal[n=SETS.NODES, t=SETS.TIME], ((BRANCHES.ASSIGNMENT_FROM[n,:] + 
+        #     BRANCHES.ASSIGNMENT_TO[n,:])./2)' * p_loss_line_abs[:,t] )
+    else
+        @expression(model, expression_line_losses_nodal[n=SETS.NODES, t=SETS.TIME], 0 )
+    end
     #-- Load serving
     # Nodal electricity exports
     @constraint(model, cons_load_serving_elec_export[n=SETS.NODES, t=SETS.TIME],
         p_g_node[n,t] + p_chp_node[n,t] + p_re[n,t] + p_hvdc_node[n,t] + p_s[n,t] + p_bio_node[n,t]
-        - p_pth_node[n,t] - p_ptg_node[n,t] - p_d[n,t] - p_hp_node[n,t] - p_emob_node[n,t] == p_ex[n,t] + p_slack_pos[n,t] - p_slack_neg[n,t])
+        - p_pth_node[n,t] - p_ptg_node[n,t] - p_d[n,t] - p_hp_node[n,t] - p_emob_node[n,t] - expression_line_losses_nodal[n,t] == p_ex[n,t] + p_slack_pos[n,t] - p_slack_neg[n,t])
     # Load serving
     @constraint(model, cons_load_serving[t=SETS.TIME], sum(p_ex[n,t] for n in SETS.NODES) == 0)
 
@@ -239,6 +272,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     # Assignment
     @constraint(model, cons_load_assignment[n=SETS.NODES, t=SETS.TIME], p_d[n,t] == ASSIGNMENTS.A_L[n,:]' * LOADS.TIMESERIES[t, :])
 
+    #-- Load flow
     # line loading calculated but not constrained for debugging informaton #if PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL+RD" # consider line restrictions if nodal setup, when zonal+RD, then do NOT use line restrictions
     # PTDF definition
     # @constraint(model, cons_line_power_flow[m=SETS.BRANCHES, t=SETS.TIME], p_branch[m,t] == BRANCHES.PTDF[m,:]' * p_ex[:,t])
@@ -253,10 +287,10 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
         BOOLEAN_CONSIDER_BRANCH = (BRANCHES.PMAX .<= 9999999)
         #println(BOOLEAN_CONSIDER_BRANCH)
         println("relevant branches for constraints: " * string(sum(BOOLEAN_CONSIDER_BRANCH)) * " out of total amount of: " * string(length(BOOLEAN_CONSIDER_BRANCH)))
-        # Max. line capacity 1 (positive)
-        @constraint(model, cons_line_max_capacity_1[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * p_branch[m,t] <= BRANCHES.PMAX[m])
-        # Max. line capacity 2 (negative)
-        @constraint(model, cons_line_max_capacity_2[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * -p_branch[m,t] <= BRANCHES.PMAX[m])
+        # Max. line capacity (positive)
+        @constraint(model, cons_line_max_capacity[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * p_branch[m,t] <= BRANCHES.PMAX[m])
+        # # Max. line capacity 2 (negative)
+        # @constraint(model, cons_line_max_capacity_2[m=SETS.BRANCHES, t=SETS.TIME], BOOLEAN_CONSIDER_BRANCH[m] * -p_branch[m,t] <= BRANCHES.PMAX[m])
     end
 
     #-- HVDC

@@ -49,6 +49,8 @@ struct single_model_result
     SP_HS_Q_MAX
     INVEST_GAS_DUAL #dual of gas investment capacity
     INVEST_PTG_DUAL #dual of ptg investment capacity
+    DUAL_P_MAX
+    DUAL_ENERGY
 end
 
 
@@ -132,7 +134,9 @@ function single_model_result(PARAMETER_SETTINGS, SETS, model)
         SP_HS_Q_MAX[:,1], # init value
         SP_HS_Q_MAX[:,2:end],
         INVEST_GAS_DUAL, # dual of invested gas capacity (relevant for Benders decomposition)
-        INVEST_PTG_DUAL # dual of invested ptg capacity (relevant for Benders decomposition)
+        INVEST_PTG_DUAL, # dual of invested ptg capacity (relevant for Benders decomposition)
+        dual.(model[:cons_line_max_capacity]).data, # congestion dual variables
+        dual.(model[:cons_load_serving]).data, # energy dual variable
         )
 end
 
@@ -186,7 +190,9 @@ function initialize_market_results_all(MI)
         :SP_HS_Q_MAX_INIT,
         :SP_HS_Q_MAX,
         :INVEST_GAS_DUAL, # dual of invested gas capacity (relevant for Benders decomposition)
-        :INVEST_PTG_DUAL # dual of invested ptg capacity (relevant for Benders decomposition)
+        :INVEST_PTG_DUAL, # dual of invested ptg capacity (relevant for Benders decomposition)
+        :DUAL_P_MAX,
+        :DUAL_ENERGY
     )
 
     empty_vals = ( Vector{String}(broadcast(string, zeros(MI.PERIODS.N_PERIODS))), # MODELSTATUS
@@ -234,7 +240,9 @@ function initialize_market_results_all(MI)
         Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.PERIODS.N_PERIODS), # SP_HS_Q_MAX_INIT
         Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), # SP_HS_Q_MAX
         Array{Union{Float64,Missing}}(missing,MI.SETS.GENS[end]), # INVEST_GAS_DUAL
-        Array{Union{Float64,Missing}}(missing,MI.SETS.PTH[end]) # INVEST_PTG_DUAL
+        Array{Union{Float64,Missing}}(missing,MI.SETS.PTH[end]), # INVEST_PTG_DUAL
+        Array{Union{Float64,Missing}}(missing,MI.SETS.BRANCHES[end], MI.SETS.TIME[end]), # DUAL VARIABLES BRANCHES
+        Array{Union{Float64,Missing}}(missing,MI.SETS.TIME[end]) # DUAL ENERGY
     )
 
     return (; zip(market_keys, empty_vals)...)
@@ -353,6 +361,8 @@ function append_single_model_result(RESULTS_ALL, MARKET_RESULT, PARAMETER_SETTIN
          RESULTS_ALL.SP_HS_INIT[:, idx_period] = MARKET_RESULT.SP_HS_INIT
          RESULTS_ALL.OPERATIONAL_COSTS[:, IN_TIME_NO_OVERLAP] = MARKET_RESULT.OPERATIONAL_COSTS[:, 1:PARAMETER_SETTINGS.PERIOD_LENGTH]
          RESULTS_ALL.FILLING_LEVEL[:, IN_TIME_NO_OVERLAP] = MARKET_RESULT.FILLING_LEVEL[:,1:PARAMETER_SETTINGS.PERIOD_LENGTH]
+         RESULTS_ALL.DUAL_P_MAX[:, IN_TIME_NO_OVERLAP] = MARKET_RESULT.DUAL_P_MAX[:, 1:PARAMETER_SETTINGS.PERIOD_LENGTH]
+         RESULTS_ALL.DUAL_ENERGY[IN_TIME_NO_OVERLAP] = MARKET_RESULT.DUAL_ENERGY
          
          # Save results of optimization: IN_TIME_NO_OVERLAP
          RESULTS_ALL.GEN_EL_ONLY[:, IN_TIME_NO_OVERLAP] = MARKET_RESULT.GEN_EL_ONLY[:, 1:PARAMETER_SETTINGS.PERIOD_LENGTH]

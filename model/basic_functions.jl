@@ -70,9 +70,13 @@ function create_PTDF(IN_LINE, IN_NODE, COLUMNS_LINE, COLUMNS_NODE, SLACK_NODE)
 
     # Create A Matrix (lines x nodes)
     A = zeros(size(IN_LINE,1), size(IN_NODE,1))
+    A_FROM = zeros(size(IN_LINE,1), size(IN_NODE,1))
+    A_TO = zeros(size(IN_LINE,1), size(IN_NODE,1))
     for i in 1:size(IN_LINE,1)
         A[i,temp_IN_LINE[i,COLUMNS_LINE[2]]]=1
         A[i,temp_IN_LINE[i,COLUMNS_LINE[3]]]=-1
+        A_FROM[i,temp_IN_LINE[i,COLUMNS_LINE[2]]]=1
+        A_TO[i,temp_IN_LINE[i,COLUMNS_LINE[3]]]=1
     end
 
     # Remove slack node from A => create A_
@@ -89,8 +93,11 @@ function create_PTDF(IN_LINE, IN_NODE, COLUMNS_LINE, COLUMNS_NODE, SLACK_NODE)
     # Create Matrix for nodes
     DELTA_LF_MATRIX_NODE = A'*B*A
 
+    RESISTANCE = temp_IN_LINE[:,COLUMNS_LINE.r]
+
     # Append slack to PTDF
     return append_slack_2_ptdf(PTDF_NO_SLACK, SLACK_NODE), DELTA_LF_MATRIX_LINE, DELTA_LF_MATRIX_NODE
+    return append_slack_2_ptdf(PTDF_NO_SLACK, SLACK_NODE), DELTA_LF_MATRIX_LINE, DELTA_LF_MATRIX_NODE, A_FROM', A_TO', RESISTANCE
 end
 
 function create_assignment_matrix_HVDC(IN_LINE, IN_NODE, COLUMNS_NODE, COLUMNS_HVDC)
@@ -124,6 +131,7 @@ function preprocess_ac_lines_and_transformers(data_elec_network, COLS_TRANSFORME
 
     # Names of technical parameters of transformers
     reactance_name = COLS_AC_LINE.x
+    resistance_name = COLS_AC_LINE.r
     length = COLS_AC_LINE.length
     voltage_level = COLS_AC_LINE.voltage_level
     max_current = COLS_AC_LINE.imax
@@ -136,6 +144,8 @@ function preprocess_ac_lines_and_transformers(data_elec_network, COLS_TRANSFORME
     # Internal names
     reactance = "x"
     tmp_reactance = "Reactance"
+    resistance = "r"
+    tmp_resistance = "Resistance"
     f_node = "node_id1"
     t_node = "node_id2"
     voltage_level_f = "voltage_level_f"
@@ -160,10 +170,12 @@ function preprocess_ac_lines_and_transformers(data_elec_network, COLS_TRANSFORME
     # Create empty dataframe for output
     branches = DataFrame()
 
-    # prepare and add transformer information to branches
+    # Prepare and add transformer information to branches
 
-    # Get impedance of transformers: Z_k = (u_k / S_n) * (U_ref^2 / 100) with Z_k = X_k (approx.)
+    # Get reactance (impedance) of transformers: X_k ≈ Z_k = (u_k / S_n) * (U_ref^2 / 100) with Z_k = X_k (approx.)
     in_trafos[:,reactance] = in_trafos[:, short_circuit_voltage] ./ in_trafos[:, nominal_apparent_power] * ref_voltage^2/100
+    # Get resistance of transformers: R_k ≈ Z_k * 0.01
+    in_trafos[:,resistance] = in_trafos[:, short_circuit_voltage] ./ in_trafos[:, nominal_apparent_power] * ref_voltage^2/100 * 0.01
     # Get node IDs of branches
     in_trafos[:,f_node] = in_trafos[:,node_1] # [findall( x -> x == in_trafos[idx,node_1], in_nodes[:,node_name])[1] for idx = 1:N_trafos]
     in_trafos[:,t_node] = in_trafos[:,node_2] # [findall( x -> x == in_trafos[idx,node_2], in_nodes[:,node_name])[1] for idx = 1:N_trafos]
@@ -177,15 +189,17 @@ function preprocess_ac_lines_and_transformers(data_elec_network, COLS_TRANSFORME
     # Indicate type of branch
     in_trafos[:, branch_type] .= transformer
 
-    append!(branches, DataFrame(x=in_trafos[:,reactance], node_id1=in_trafos[:,f_node],
+    append!(branches, DataFrame(x=in_trafos[:,reactance], r=in_trafos[:,resistance], node_id1=in_trafos[:,f_node],
     node_id2=in_trafos[:,t_node], Pmax = in_trafos[:, max_capacity], Voltage_level_f=in_trafos[:,voltage_level_f] , Voltage_level_t=in_trafos[:,voltage_level_t],
     Branch_type = in_trafos[:, branch_type] ))
 
 
-    # prepare line information of branches, then append afterwards to branches dataframe
+    # Prepare line information of branches, then append afterwards to branches dataframe
 
-    # Convert impedance of lines to reference voltage level by X_ref = X_l * (U_ref / U_N)^2
+    # Convert reactance of lines to reference voltage level by X_ref = X_l * (U_ref / U_N)^2
     in_lines[:,tmp_reactance] = in_lines[:,reactance_name] .* in_lines[:,length] .*( ref_voltage ./ in_lines[:,voltage_level] ).^2
+    # Convert resistance of lines to reference voltage level by R_ref = R_l * (U_ref / U_N)^2
+    in_lines[:,tmp_resistance] = in_lines[:,resistance_name] .* in_lines[:,length] .*( ref_voltage ./ in_lines[:,voltage_level] ).^2
     # Get max. power of line in MW
     in_lines[:,max_capacity] = 3^0.5 * in_lines[:,voltage_level] .* in_lines[:,max_current]
 
@@ -205,11 +219,11 @@ function preprocess_ac_lines_and_transformers(data_elec_network, COLS_TRANSFORME
 
     # Append lines to branches
     if nrow(branches) > 0 
-        append!(branches, DataFrame(x=in_lines[:,tmp_reactance], node_id1=in_lines[:,f_node],
+        append!(branches, DataFrame(x=in_lines[:,tmp_reactance], r=in_lines[:,tmp_resistance], node_id1=in_lines[:,f_node],
             node_id2=in_lines[:,t_node], Pmax = in_lines[:, max_capacity], Voltage_level_f=in_lines[:,voltage_level_f] , Voltage_level_t=in_lines[:,voltage_level_t],
             Branch_type=in_lines[:, branch_type] ))
     else # if model has no transformers (adding empty dataframe "branches" to line dataframe causes errors do to appending missing and non-missing values together)
-        branches = DataFrame(x=in_lines[:,tmp_reactance], node_id1=in_lines[:,f_node],
+        branches = DataFrame(x=in_lines[:,tmp_reactance], r=in_lines[:,tmp_resistance], node_id1=in_lines[:,f_node],
         node_id2=in_lines[:,t_node], Pmax = in_lines[:, max_capacity], Voltage_level_f=in_lines[:,voltage_level_f] , Voltage_level_t=in_lines[:,voltage_level_t],
         Branch_type=in_lines[:, branch_type])
     end

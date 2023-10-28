@@ -226,13 +226,13 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
     A_G = basic_functions.create_assignment_matrix(INPUT.IN_NODE, INPUT.IN_CONVENTIONAL, COLUMN_DEFINITIONS.COLUMNS_CONVENTIONAL.node_id, COLUMN_DEFINITIONS.COLUMNS_NODE.node_id)
     #-- Renewable A_REN assignment matrix (Dimension: nodes x powerplants)
     A_REN = basic_functions.create_assignment_matrix_timeseries(INPUT.IN_NODE, INPUT.IN_RENEWABLE, INPUT.IN_RENEWABLE_TIMESERIES, COLUMN_DEFINITIONS.COLUMNS_RENEWABLE.unit_name, COLUMN_DEFINITIONS.COLUMNS_NODE.node_id)
-    #-- Laod A_L assignment matrix (Dimension: nodes x loads)
+    #-- Load A_L assignment matrix (Dimension: nodes x loads)
     A_L = basic_functions.create_assignment_matrix_timeseries(INPUT.IN_NODE, INPUT.IN_LOAD, INPUT.IN_LOAD_TIMESERIES, COLUMN_DEFINITIONS.COLUMNS_LOAD.unit_name, COLUMN_DEFINITIONS.COLUMNS_NODE.node_id)
     #-- storage A_L assignment matrix (Dimension: nodes x storages)
     A_STOR = basic_functions.create_assignment_matrix(INPUT.IN_NODE, INPUT.IN_STORAGE, COLUMN_DEFINITIONS.COLUMNS_STORAGE.node_id, COLUMN_DEFINITIONS.COLUMNS_NODE.node_id)
     #-- Combined heat power plants (CHP) A_CHP assignment matrix (Dimension: nodes x CHP)
     A_CHP_EL = basic_functions.create_assignment_matrix(INPUT.IN_NODE, INPUT.IN_COMBINEDHEATPOWER_ELEC, COLUMN_DEFINITIONS.COLUMNS_COMBINEDHEATPOWER.node_id, COLUMN_DEFINITIONS.COLUMNS_NODE.node_id)
-    #-- HEATlaod A_CHP_H assignment matrix (Dimension: nodes x heatloads)
+    #-- HEATload A_CHP_H assignment matrix (Dimension: nodes x heatloads)
     A_CHP_H = basic_functions.create_assignment_matrix(INPUT.IN_HEAT_NODE, INPUT.IN_COMBINEDHEATPOWER_HEAT, COLUMN_DEFINITIONS.COLUMNS_COMBINEDHEATPOWER.heatregion_id, COLUMN_DEFINITIONS.COLUMNS_HEATREGION.heatregion_id)
     #-- HVDC assignment matrix (Dimension: HVDC lines x nodes)
     A_HVDC, A_HVDC_LOSS = basic_functions.create_assignment_matrix_HVDC(INPUT.IN_HVDC, INPUT.IN_NODE, COLUMN_DEFINITIONS.COLUMNS_NODE, COLUMN_DEFINITIONS.COLUMNS_HVDC)
@@ -260,7 +260,7 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
     A_HEAT_DEMAND = basic_functions.create_assignment_matrix_timeseries(INPUT.IN_HEAT_NODE, INPUT.IN_HEAT_DEMAND, INPUT.IN_HEAT_DEMAND_TIMESERIES, COLUMN_DEFINITIONS.COLUMNS_HEAT_DEMAND.unit_name, COLUMN_DEFINITIONS.COLUMNS_HEATREGION.heatregion_id)
     # basic_functions.create_assignment_matrix(INPUT.IN_HEAT_NODE, INPUT.IN_HEAT_DEMAND, COLUMN_DEFINITIONS.COLUMNS_HEAT_DEMAND.heatregion_id, COLUMN_DEFINITIONS.COLUMNS_HEATREGION.heatregion_id)
 
-#--- Sets
+    #--- Sets
     SET_PTG = 1:size(INPUT.IN_PTG,1)
     SET_GENS = 1:size(INPUT.IN_CONVENTIONAL,1)
     SET_RENS = 1:size(INPUT.IN_RENEWABLE,1)
@@ -286,8 +286,30 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
     SET_HEAT_DEMAND = 1:size(INPUT.IN_HEAT_DEMAND,1)
 
 #--- Create PTDF and matrices for voltage angle definition of power flow
-    PTDF, DELTA_LF_MATRIX_LINE, DELTA_LF_MATRIX_NODE = basic_functions.create_PTDF(INPUT.IN_BRANCHES, INPUT.IN_NODE, COLUMN_DEFINITIONS.COLUMNS_LINE,
+    PTDF, DELTA_LF_MATRIX_LINE, DELTA_LF_MATRIX_NODE, A_FROM, A_TO, RESISTANCE = basic_functions.create_PTDF(INPUT.IN_BRANCHES, INPUT.IN_NODE, COLUMN_DEFINITIONS.COLUMNS_LINE,
         COLUMN_DEFINITIONS.COLUMNS_NODE, PARAMETER_SETTINGS.SLACK_NODE)
+
+    P_MAX = INPUT.IN_BRANCHES[:,COLUMN_DEFINITIONS.COLUMNS_LINE.Pmax]
+
+    function get_loss_factor(RESISTANCE, P_MAX, rel_p, REF_VOLTAGE)
+        LOSS_FACTOR_m = 2/3 .* RESISTANCE .* P_MAX .* (rel_p / REF_VOLTAGE^2)
+        LOSS_FACTOR_b = -1/3 .* RESISTANCE .* P_MAX.^2 .* (rel_p^2 / REF_VOLTAGE^2)
+        return LOSS_FACTOR_m, LOSS_FACTOR_b
+    end
+
+    # Loss factors
+    LOSS_FACTOR_m, _ = get_loss_factor(RESISTANCE, P_MAX, 0.3125, PARAMETER_SETTINGS.REF_VOLTAGE)
+
+    # LOSS_FACTOR_m0, LOSS_FACTOR_b0 = get_loss_factor(RESISTANCE, P_MAX, 0.675, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # LOSS_FACTOR_m1, LOSS_FACTOR_b1 = get_loss_factor(RESISTANCE, P_MAX, 0.1875, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # LOSS_FACTOR_m2, LOSS_FACTOR_b2 = get_loss_factor(RESISTANCE, P_MAX, 0.4, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # LOSS_FACTOR_m3, LOSS_FACTOR_b3 = get_loss_factor(RESISTANCE, P_MAX, 0.6375, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # LOSS_FACTOR_m4, LOSS_FACTOR_b4 = get_loss_factor(RESISTANCE, P_MAX, 0.8875, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # LOSS_FACTOR_m1a, LOSS_FACTOR_b1a = get_loss_factor(RESISTANCE, P_MAX, 0.18625, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # LOSS_FACTOR_m2a, LOSS_FACTOR_b2a = get_loss_factor(RESISTANCE, P_MAX, 0.7375, PARAMETER_SETTINGS.REF_VOLTAGE)
+    # # Introducing an offset
+    # LOSS_FACTOR_b2a = LOSS_FACTOR_b2a .- LOSS_FACTOR_b1a.*0.725
+    # LOSS_FACTOR_b1a = LOSS_FACTOR_b1a .* 0
 
 #--- Create strcuts for better function handling
     BRANCHES = (
@@ -298,6 +320,24 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
         BRANCH_TYPE = INPUT.IN_BRANCHES[:,COLUMN_DEFINITIONS.COLUMNS_LINE.Branch_type],
         VOLTAGE_F = INPUT.IN_BRANCHES[:,COLUMN_DEFINITIONS.COLUMNS_LINE.Voltage_level_f],
         VOLTAGE_T = INPUT.IN_BRANCHES[:,COLUMN_DEFINITIONS.COLUMNS_LINE.Voltage_level_t],
+        ASSIGNMENT_FROM = A_FROM,
+        ASSIGNMENT_TO = A_TO,
+        # RESISTANCE = RESISTANCE,
+        # LOSS_FACTOR_m0 = LOSS_FACTOR_m0,
+        # LOSS_FACTOR_b0 = LOSS_FACTOR_b0,
+        # LOSS_FACTOR_m1 = LOSS_FACTOR_m1,
+        # LOSS_FACTOR_b1 = LOSS_FACTOR_b1,
+        # LOSS_FACTOR_m2 = LOSS_FACTOR_m2,
+        # LOSS_FACTOR_b2 = LOSS_FACTOR_b2,
+        # LOSS_FACTOR_m3 = LOSS_FACTOR_m3,
+        # LOSS_FACTOR_b3 = LOSS_FACTOR_b3,
+        # LOSS_FACTOR_m4 = LOSS_FACTOR_m4,
+        # LOSS_FACTOR_b4 = LOSS_FACTOR_b4,
+        # LOSS_FACTOR_m1a = LOSS_FACTOR_m1a,
+        # LOSS_FACTOR_b1a = LOSS_FACTOR_b1a,
+        # LOSS_FACTOR_m2a = LOSS_FACTOR_m2a,
+        # LOSS_FACTOR_b2a = LOSS_FACTOR_b2a,
+        LOSS_FACTOR_m = LOSS_FACTOR_m,
     )
     LOADS = (
         TIMESERIES = Matrix{Float64}(INPUT.IN_LOAD_TIMESERIES[:,2:end]),
@@ -473,6 +513,18 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
         CONST_HEAT_LOAD = CONST_HEAT_LOAD,
         PTG = POWER_TO_GAS
     )
+
+
+    if PARAMETER_SETTINGS.TRANSFORMER_RESTRICTIONS == "NOT ACTIVE"
+        # find considered branches
+        idx_trafos = MODEL_INPUT.BRANCHES.BRANCH_TYPE .== "Transformer"
+        print("Transformers: Amount = " * string(sum(idx_trafos)))
+        # Select considered branches
+        if sum(idx_trafos) > 0
+            println(" --> For " * string(sum(idx_trafos)) * " transformers, thermal limit will be increased to: " * string(9999999) * ".")
+            MODEL_INPUT.BRANCHES.PMAX[idx_trafos] = ones(sum(idx_trafos), 1) * 9999999
+        end
+    end
     
     if PARAMETER_SETTINGS.LINE_RESTRICTIONS_VOLTAGE > 0
         # find considered branches
@@ -596,7 +648,8 @@ function input_parameter_definitions_columns()
             imax="imax",
             Branch_type="Branch_type",
             Voltage_level_f= "Voltage_level_f",
-            Voltage_level_t= "Voltage_level_t"
+            Voltage_level_t= "Voltage_level_t",
+            r="r",
         ),
         COLUMNS_CONVENTIONAL = (
             unit_name="unit_name",
