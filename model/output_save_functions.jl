@@ -31,13 +31,9 @@ function save_output_combination(RESULTS_ALL, MODEL_INPUT, INPUT, COLUMN_DEFINIT
 
     # Save as JLD2
     if input_dict["jld2"]
-        if PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL+RD"
-            filenames = ["PARAMETER_SETTINGS", "INPUT", "MODEL_INPUT", "RESULTS_ALL", "RD_RESULTS_ALL"];
-            save_multiple_jld2([PARAMETER_SETTINGS, INPUT, MODEL_INPUT, RESULTS_ALL, RD_RESULTS_ALL],  filenames)
-        else
-            filenames = ["PARAMETER_SETTINGS", "INPUT", "MODEL_INPUT", "RESULTS_ALL"];
-            save_multiple_jld2([PARAMETER_SETTINGS, INPUT, MODEL_INPUT, RESULTS_ALL],  filenames)
-        end  
+        filenames = ["PARAMETER_SETTINGS", "INPUT", "MODEL_INPUT", "RESULTS_ALL"];
+        save_multiple_jld2([PARAMETER_SETTINGS, INPUT, MODEL_INPUT, RESULTS_ALL],  filenames)
+          
     end
 
     return nothing

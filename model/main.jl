@@ -68,6 +68,6 @@ output_save_functions.save_output_combination(RESULTS_ALL, INPUT, INPUT_RAW, COL
 # ======
 # ==== plotting or results
 # ======
-what_to_plot = Dict("date" => "2023_02_11_15_55_44" , "rd_date" => "2023_02_11_15_55_45", "LMP_aggregated" => false, "nodal_prices" => false, "line_loading"=>false, "rd_quantities" => true)
+what_to_plot = Dict("date" => "2023_02_11_15_55_44" , "LMP_aggregated" => false, "nodal_prices" => false, "line_loading"=>false)
 include("output_plot_functions.jl")
-output_plot_functions.plot_selection(what_to_plot, INPUT, RESULTS_ALL, RD_RESULTS_ALL, PARAMETER_SETTINGS)
+output_plot_functions.plot_selection(what_to_plot, INPUT, RESULTS_ALL, PARAMETER_SETTINGS)

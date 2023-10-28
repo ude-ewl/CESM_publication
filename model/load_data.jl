@@ -205,7 +205,7 @@ function load_data_from_tmp_folder(PARAMETER_SETTINGS)
     data_elec_bev_commercial = DataFrame(CSV.read(FILE_PATH.elec_bev_commercial_combined, DataFrame))
     data_elec_bev_quick = DataFrame(CSV.read(FILE_PATH.elec_bev_quickcharge, DataFrame))
 
-    if (PARAMETER_SETTINGS.FLEX_MARKET.EMOB == "Flex") | (PARAMETER_SETTINGS.FLEX_RD.EMOB == "Flex")
+    if (PARAMETER_SETTINGS.FLEX_MARKET.EMOB == "Flex")
         data_elec_bev_residential_pmax = DataFrame(CSV.read(FILE_PATH.assignment_elec_bev_residential_pmax, DataFrame))
     else
         data_elec_bev_residential_pmax = data_elec_bev_residential

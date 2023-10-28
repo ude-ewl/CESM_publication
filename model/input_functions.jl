@@ -456,7 +456,7 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
         PMAX  = Matrix{Float64}(INPUT.IN_EMOB_RESIDENTIAL_TIMESERIES_PMAX[:,2:end])
     )
 
-    if ((PARAMETER_SETTINGS.FLEX_MARKET.EMOB == "Flex") | (PARAMETER_SETTINGS.FLEX_RD.EMOB == "Flex"))
+    if (PARAMETER_SETTINGS.FLEX_MARKET.EMOB == "Flex")
         @set EMOB_RESIDENTIAL.PMAX = max.(2*EMOB_RESIDENTIAL.TIMESERIES, EMOB_RESIDENTIAL.PMAX)
         println("EMOB load is limited to max. 2x grid friendly charging timeseries for the \"Flex\" model (system oriented smart charging).")
     end

@@ -7,9 +7,6 @@ include("data_containers.jl")
 #--- Create optimization function
 function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, HP_Q_0, CONV_ONLINE_LASTPERIOD, CHP_ONLINE_LASTPERIOD)
 
-    c_invest_gas = 999*1e3/52
-    c_invest_ptg = 9*1e3/52
-
     BRANCHES = MI.BRANCHES
     LOADS = MI.LOADS
     RENEWABLES = MI.RENEWABLES
@@ -112,13 +109,6 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     #- Costs
     # Operational costs of power plant k at SETS.TIME step t (in €)
     @variable(model, c_g_op[SETS.GENS, SETS.TIME] >= 0)
-
-    # investment variable if endogeneous gas capacity modeling
-    if ((PARAMETER_SETTINGS.MODEL_TYPE == "INVEST"))
-        @variable(model, p_g_unit_invest[SETS.GENS] >= 0)
-        @variable(model, p_ptg_unit_invest[k=SETS.PTG] >= 0)
-    end
-
 
     #-- Renewables
     # Nodal power injection of renewables at node n during SETS.TIME step t (in MW)
@@ -234,7 +224,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
 
     #--- Optimization: Constraint definitions
 
-    if PARAMETER_SETTINGS.MODEL_TYPE == "CESM" # consider line restrictions if CESM (nodal) setup, when zonal+RD, do NOT use line restrictions
+    if PARAMETER_SETTINGS.MODEL_TYPE == "CESM" # consider line restrictions if "CESM" (nodal) setup. In "Zonal" setup lines loading is not contrained
         # Get absolute power flow across branches
         @constraint(model, cons_line_losses_abs_1[m=SETS.BRANCHES, t=SETS.TIME], p_branch_abs[m,t] >= p_branch[m,t] )
         @constraint(model, cons_line_losses_abs_2[m=SETS.BRANCHES, t=SETS.TIME], p_branch_abs[m,t] >= -p_branch[m,t] )
@@ -273,7 +263,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     @constraint(model, cons_load_assignment[n=SETS.NODES, t=SETS.TIME], p_d[n,t] == ASSIGNMENTS.A_L[n,:]' * LOADS.TIMESERIES[t, :])
 
     #-- Load flow
-    # line loading calculated but not constrained for debugging informaton #if PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL+RD" # consider line restrictions if nodal setup, when zonal+RD, then do NOT use line restrictions
+    # line loading calculated but not constrained for debugging informaton, if PARAMETER_SETTINGS.MODEL_TYPE is set to "ZONAL"
     # PTDF definition
     # @constraint(model, cons_line_power_flow[m=SETS.BRANCHES, t=SETS.TIME], p_branch[m,t] == BRANCHES.PTDF[m,:]' * p_ex[:,t])
     # Voltage-angle definition
@@ -282,7 +272,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     # Slack node
     @constraint(model, cons_slack_node[t=SETS.TIME], delta_lf[PARAMETER_SETTINGS.SLACK_NODE, t] == 0 )
 
-    if PARAMETER_SETTINGS.MODEL_TYPE == "CESM" # consider line restrictions if CESM (nodal) setup, when zonal+RD, do NOT use line restrictions
+    if PARAMETER_SETTINGS.MODEL_TYPE == "CESM" # consider line restrictions if "CESM" (nodal) setup, when "Zonal", do NOT use line restrictions
         # determine which lines  to consider
         BOOLEAN_CONSIDER_BRANCH = (BRANCHES.PMAX .<= 9999999)
         #println(BOOLEAN_CONSIDER_BRANCH)
@@ -325,11 +315,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     # Max. generation capacity
     @constraint(model, cons_conventional_max_capacity[k=SETS.GENS, t=SETS.TIME], p_g_unit[k,t] <= p_g_unit_online[k,t])
     # Max. online capacity
-    if ((PARAMETER_SETTINGS.MODEL_TYPE == "INVEST"))
-        @constraint(model, cons_conventional_invest[k=SETS.GENS, t=SETS.TIME], p_g_unit_online[k,t] <= p_g_unit_invest[k])
-    elseif (PARAMETER_SETTINGS.MODEL_TYPE == "CESM") | (PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL") | (PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL+RD") | (PARAMETER_SETTINGS.MODEL_TYPE == "BENDERS INVEST")
-        @constraint(model, cons_conventional_invest[k=SETS.GENS, t=SETS.TIME], p_g_unit_online[k,t] <= CONVENTIONALS.PMAX[k])
-    end
+    @constraint(model, cons_conventional_invest[k=SETS.GENS, t=SETS.TIME], p_g_unit_online[k,t] <= CONVENTIONALS.PMAX[k])
     
     # Min. generation capacity
     @constraint(model, cons_conventional_min_capacity[k=SETS.GENS, t=SETS.TIME], CONVENTIONALS.R_G[k] * p_g_unit_online[k,t] <= p_g_unit[k,t] )
@@ -371,12 +357,8 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
 
 
     #-- Power to gas  
-    if (PARAMETER_SETTINGS.MODEL_TYPE == "INVEST")
-        @constraint(model, cons_ptg_invest[k=SETS.PTG, t=SETS.TIME], p_ptg_unit[k,t] <= p_ptg_unit_invest[k])
-    elseif (PARAMETER_SETTINGS.MODEL_TYPE == "CESM") | (PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL") | (PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL+RD") | (PARAMETER_SETTINGS.MODEL_TYPE == "BENDERS INVEST")
-        @constraint(model, cons_ptg_invest[k=SETS.PTG, t=SETS.TIME], p_ptg_unit[k,t] <= PTG.PMAX[k])
-    end
-    
+    @constraint(model, cons_ptg_invest[k=SETS.PTG, t=SETS.TIME], p_ptg_unit[k,t] <= PTG.PMAX[k])
+     
     # Assignment to heat regions
     add_constraint_sparse_2D(model, ASSIGNMENTS.A_PTG, p_ptg_unit, "==", p_ptg_node, "cons_ptg_assignment");
     # Hydrogen production
@@ -546,16 +528,7 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
     add_constraint_sparse_2D(model, ASSIGNMENTS.A_EMOB_COMMERCIAL, EMOB_COMMERCIAL.TIMESERIES', "==", p_emob_node_commercial, "cons_emob_commercial");
     add_constraint_sparse_2D(model, ASSIGNMENTS.A_EMOB_QUICK, EMOB_QUICK.TIMESERIES', "==", p_emob_node_quick, "cons_emob_quick");
 
-  
-    # Investment cost
-    if ((PARAMETER_SETTINGS.MODEL_TYPE == "INVEST"))
-        @expression(model, expression_invest, 
-            c_invest_gas * sum(p_g_unit_invest[k] for k in SETS.GENS)
-            + c_invest_ptg * sum(p_ptg_unit_invest[k] for k in SETS.PTG))
-    elseif ((PARAMETER_SETTINGS.MODEL_TYPE == "CESM") | (PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL") | (PARAMETER_SETTINGS.MODEL_TYPE == "ZONAL+RD")  | (PARAMETER_SETTINGS.MODEL_TYPE == "BENDERS INVEST"))
-        @expression(model, expression_invest, 0)
-    end
-      
+
     # Objective function
     @objective(model, Min,
         # Fuel prices
@@ -568,9 +541,6 @@ function build_market_model(MI, SETS, E_0, IS_FIRST_PERIOD, PARAMETER_SETTINGS, 
         + sum(p_chp_unit_startup[k,t]*COMBINEDHEATPOWERS.START_UP_COSTS[k] for k in SETS.CHPS, t in (SETS.TIME[begin]+1):SETS.TIME[end])
         # Power to gas slack
         + sum(p_ptg_slack[t] * PTG.HYDROGEN_PRICE[1] for t in SETS.TIME)
-        
-        # Expression for investment decisions
-        + expression_invest
         
         # Slacks
         + 99999999 * sum(q_chp_region_slack[r,t] for r in SETS.HEATREGIONS, t in SETS.TIME)

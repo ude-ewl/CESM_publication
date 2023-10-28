@@ -47,8 +47,6 @@ struct single_model_result
     SP_HE_P_MAX
     SP_HS_Q_MAX_INIT
     SP_HS_Q_MAX
-    INVEST_GAS_DUAL #dual of gas investment capacity
-    INVEST_PTG_DUAL #dual of ptg investment capacity
     DUAL_P_MAX
     DUAL_ENERGY
 end
@@ -56,7 +54,7 @@ end
 
 function single_model_result(PARAMETER_SETTINGS, SETS, model)
     
-    if ((PARAMETER_SETTINGS.FLEX_MARKET.HP == "TS") | (PARAMETER_SETTINGS.FLEX_RD.HP == "TS"))
+    if (PARAMETER_SETTINGS.FLEX_MARKET.HP == "TS")
         HP_HS_FILLING_LEVEL = zeros(SETS.HPS[end],PARAMETER_SETTINGS.PERIOD_LENGTH+1)
         HP_P = zeros(SETS.HPS[end],PARAMETER_SETTINGS.PERIOD_LENGTH)
         HP_HE_P = zeros(SETS.HPS[end],PARAMETER_SETTINGS.PERIOD_LENGTH)
@@ -79,17 +77,6 @@ function single_model_result(PARAMETER_SETTINGS, SETS, model)
         SP_HE_P_MAX = dual.(model[:cons_heatpump_heatelement_max_power]).data
         SP_HS_Q_MAX = dual.(model[:cons_heatpump_heatstorage_max_capacity]).data         # 25 dual values
     end
-
-    if PARAMETER_SETTINGS.MODEL_TYPE != "BENDERS INVEST"
-        INVEST_GAS_DUAL = zeros(SETS.GENS[end],1)
-        INVEST_PTG_DUAL = zeros(SETS.PTG[end],1)
-    else
-        #println(value.(model[:p_g_unit_invest]).data)
-        INVEST_GAS_DUAL = dual.(model[:cons_conventional_invest]).data
-        INVEST_PTG_DUAL = dual.(model[:cons_ptg_invest]).data
-
-    end
-    #println(PARAMETER_SETTINGS.MODEL_TYPE != "BENDERS INVEST")
 
     return single_model_result(   
         termination_status(model), #(1)
@@ -133,8 +120,6 @@ function single_model_result(PARAMETER_SETTINGS, SETS, model)
         SP_HE_P_MAX,
         SP_HS_Q_MAX[:,1], # init value
         SP_HS_Q_MAX[:,2:end],
-        INVEST_GAS_DUAL, # dual of invested gas capacity (relevant for Benders decomposition)
-        INVEST_PTG_DUAL, # dual of invested ptg capacity (relevant for Benders decomposition)
         dual.(model[:cons_line_max_capacity]).data, # congestion dual variables
         dual.(model[:cons_load_serving]).data, # energy dual variable
         )
@@ -189,8 +174,6 @@ function initialize_market_results_all(MI)
         :SP_HE_P_MAX,
         :SP_HS_Q_MAX_INIT,
         :SP_HS_Q_MAX,
-        :INVEST_GAS_DUAL, # dual of invested gas capacity (relevant for Benders decomposition)
-        :INVEST_PTG_DUAL, # dual of invested ptg capacity (relevant for Benders decomposition)
         :DUAL_P_MAX,
         :DUAL_ENERGY
     )
@@ -239,110 +222,11 @@ function initialize_market_results_all(MI)
         Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), # SP_HE_P_MAX
         Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.PERIODS.N_PERIODS), # SP_HS_Q_MAX_INIT
         Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), # SP_HS_Q_MAX
-        Array{Union{Float64,Missing}}(missing,MI.SETS.GENS[end]), # INVEST_GAS_DUAL
-        Array{Union{Float64,Missing}}(missing,MI.SETS.PTH[end]), # INVEST_PTG_DUAL
         Array{Union{Float64,Missing}}(missing,MI.SETS.BRANCHES[end], MI.SETS.TIME[end]), # DUAL VARIABLES BRANCHES
         Array{Union{Float64,Missing}}(missing,MI.SETS.TIME[end]) # DUAL ENERGY
     )
 
     return (; zip(market_keys, empty_vals)...)
-end
-
-function initialize_rd_results_all(MI)
-
-    rd_keys = ( 
-        :MODELSTATUS, #(1)
-        :OBJ_VAL, 
-        :SOLVE_TIME,
-        :PRICES,
-        :CONV_ONLINE_LASTPERIOD, #(5)
-        :CHP_ONLINE_LASTPERIOD,
-        :TMP_FILLING_LEVEL_0,
-        :OPERATIONAL_COSTS,
-        :FILLING_LEVEL,
-        :GEN_EL_ONLY, #(10)
-        :GEN_EL_CHP,
-        :GEN_HEAT_CHP,
-        :OPERATIONAL_COSTS_CHP,
-        :FLOW_EL_BRANCH,
-        :HVDC_FLOW, #(15)
-        :SLACK_Q,
-        :GEN_EL_BIO,
-        :GEN_HY_ROR,
-        :LOAD_EMOB_RESIDENTIAL,
-        :LOAD_EMOB_COMMERCIAL, #(20)
-        :LOAD_EMOB_QUICKCHARGE,
-        :RENEWABLE_FEED_IN,
-        :STORAGES_CHARGING,
-        :STORAGES_DISCHARGING,
-        :GEN_EL_SLACKS_POS, #(25)
-        :GEN_EL_SLACKS_NEG,
-        :HP_HS_TMP_FILLING_LEVEL_0,
-        :GEN_PTG,
-        :GEN_HYDROGEN,
-        :GEN_HEAT_PTH, #(30)
-        :GEN_HEAT_ONLY,
-        :GEN_HEAT_PUMP,
-        :GEN_SLACKS_HP,
-        :HP_P,
-        :HP_HE_P, #(35)
-        :HP_P_NODE,
-        :HP_HS_FILLING_LEVEL,
-        :SP_HS_INIT,
-        :SP_HS_WATER_VALUE,
-        :SP_HP_P_MAX, #(40)
-        :SP_HE_P_MAX,
-        :SP_HS_Q_MAX_INIT,
-        :SP_HS_Q_MAX
-        )
-
-    empty_vals = ( Vector{String}(broadcast(string, zeros(MI.PERIODS.N_PERIODS))), # MODELSTATUS
-    Array{Union{Float64,Missing}}(missing,MI.PERIODS.N_PERIODS), # OBJ_VAL
-    Array{Union{Float64,Missing}}(missing,MI.PERIODS.N_PERIODS), # SOLVE TIME
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # PRICES
-    Array{Union{Float64,Missing}}(missing,MI.SETS.GENS[end], MI.PERIODS.N_PERIODS), # CONV_ONLINE_LASTPERIOD
-    Array{Union{Float64,Missing}}(missing,MI.SETS.CHPS[end], MI.PERIODS.N_PERIODS), # CHP_ONLINE_LASTPERIOD
-    Array{Union{Float64,Missing}}(missing,MI.SETS.STORS[end], MI.SETS.TIME[end]+1), # TMP_FILLING_LEVEL_0
-    Array{Union{Float64,Missing}}(missing,MI.SETS.GENS[end], MI.SETS.TIME[end]),  # OPERATIONAL_COSTS
-    Array{Union{Float64,Missing}}(missing,MI.SETS.STORS[end], MI.SETS.TIME[end]), # FILLING_LEVEL
-    Array{Union{Float64,Missing}}(missing,MI.SETS.GENS[end], MI.SETS.TIME[end]), # GEN_EL_ONLY
-    Array{Union{Float64,Missing}}(missing,MI.SETS.CHPS[end], MI.SETS.TIME[end]), # GEN_EL_CHP
-    Array{Union{Float64,Missing}}(missing,MI.SETS.CHPS[end], MI.SETS.TIME[end]), # GEN_HEAT_CHP
-    Array{Union{Float64,Missing}}(missing,MI.SETS.CHPS[end], MI.SETS.TIME[end]), # CHP Operational Costs
-    Array{Union{Float64,Missing}}(missing,MI.SETS.BRANCHES[end], MI.SETS.TIME[end]), # FLOW_EL_BRANCH
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HVDCS[end], MI.SETS.TIME[end]), # HVDC_FLOW
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HEATREGIONS[end], MI.SETS.TIME[end]), #  SLACK HEAT
-    Array{Union{Float64,Missing}}(missing,MI.SETS.BIOS[end], MI.SETS.TIME[end]), # GEN_EL_BIO
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HY_ROR[end], MI.SETS.TIME[end]), # GEN_HY_ROR
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # EMOB RESIDENTIAL at NODE
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # EMOB COMMERCIAL at NODE
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # EMOB QUICK at NODE
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # RENEWABLE_FEED_IN
-    Array{Union{Float64,Missing}}(missing,MI.SETS.STORS[end], MI.SETS.TIME[end]), # STORAGES_CHARGING
-    Array{Union{Float64,Missing}}(missing,MI.SETS.STORS[end], MI.SETS.TIME[end]), # STORAGES_DISCHARGING
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # GEN_EL_SLACKS_POS
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # GEN_EL_SLACKS_NEG
-    # zeros(SETS.HPS[end]), # HP_HS_TMP_FILLING_LEVEL_0
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]+1), # HP_HS_TMP_FILLING_LEVEL_0
-    Array{Union{Float64,Missing}}(missing,MI.SETS.PTG[end], MI.SETS.TIME[end]), # GEN_PTG
-    Array{Union{Float64,Missing}}(missing,MI.SETS.PTG[end], MI.SETS.TIME[end]), # GEN_HYDROGEN
-    Array{Union{Float64,Missing}}(missing,MI.SETS.PTH[end], MI.SETS.TIME[end]), # GEN_HEAT_PTH
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HEAT_ONLY[end], MI.SETS.TIME[end]), # GEN_HEAT_ONLY
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), #GEN_HEAT_PUMP
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), # GEN_SLACKS_HP
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), #HP_P
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), #HP_HE_P
-    Array{Union{Float64,Missing}}(missing,MI.SETS.NODES[end], MI.SETS.TIME[end]), # HP_P_NODE
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), #HP_HS_FILLING_LEVEL
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.PERIODS.N_PERIODS), # SP_HS_INIT
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), # SP_HS_WATER_VALUE
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), #SP_HP_P_MAX
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]), # SP_HE_P_MAX
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.PERIODS.N_PERIODS), # SP_HS_Q_MAX_INIT
-    Array{Union{Float64,Missing}}(missing,MI.SETS.HPS[end], MI.SETS.TIME[end]) # SP_HS_Q_MAX
-    )
-
-    return (; zip(rd_keys, empty_vals)...)
 end
 
 

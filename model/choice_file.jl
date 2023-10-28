@@ -29,7 +29,7 @@ function input_parameter_settings()
             # LINE_RESTRICTIONS
             LINE_RESTRICTIONS_VOLTAGE = 0, # exclude line restrictions for lines lower than this voltage level, e.g. 0 means that none are excluded (the voltage level written here is the least voltage level included)
             # CESM  /
-            MODEL_TYPE = "CESM", # "CESM"
+            MODEL_TYPE = "CESM", # "CESM" (nodal) or "ZONAL" (uniform price, line limits are ignored)
             # (n-1) thermal restricition of lines (in percent of max thermal line rating)
             N_MINUS_1_FACTOR = 0.85,
             # (n-1) thermal restricition applies for these line limits (the voltage level written here is the least voltage level included)
@@ -41,20 +41,12 @@ function input_parameter_settings()
             # Flexibility settings for market run
             FLEX_MARKET = (PV_RES="TS", 
                             EMOB="Flex", 
-                            HP="Flex") # in RD analysis always TS
+                            HP="Flex"),
                             # STOR is always "Flex" in market run
                             # CHP is always "Flex" in market run
                             # PTG is always "Flex" in market run
                             # PTH is always "Flex" in market run
-                            ,
-            # Flexibility settings for redispatch run
-            FLEX_RD     = (PV_RES="Flex", 
-                            EMOB="Flex",
-                            HP="Flex",
-                            STOR="Flex",
-                            CHP="EC_greater_10MW", # "EC_greater_10MW"
-                            PTG="Flex",
-                            PTH="Flex"),
+            
             # Penalty for last timestep to avoid storage emptying
             PENALTY_LAST_TIMESTEP = 5, # EUR/MWh
 
