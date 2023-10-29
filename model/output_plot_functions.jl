@@ -82,8 +82,8 @@ function plot_nodal_prices(date, PARAMETER_SETTINGS)
         lmps_aggr[!, colname] = Array(lmps[ct_hr,:])
     end
    
-    elec_nodes = DataFrame(CSV.File(abspath("../tmp_data/elec_network_nodes.csv")))
-    elec_locations = DataFrame(CSV.File(abspath("../tmp_data/location.csv")))
+    elec_nodes = DataFrame(CSV.File(abspath("../input_data/elec_network_nodes.csv")))
+    elec_locations = DataFrame(CSV.File(abspath("../input_data/location.csv")))
     elec_nodes = leftjoin(elec_nodes, elec_locations[:,["location_id", "location_name", "latitude", "longitude"]], on="location_id")
     print(string(100*sum(ismissing.(elec_nodes.latitude))/length(elec_nodes.latitude)) * " % missing latlons due to location_id mismatch")
 
@@ -103,11 +103,11 @@ function plot_line_loading(date, PARAMETER_SETTINGS)
     highload_threshold = 0.95
 
     # ---- static model input data ----
-    elec_nodes = DataFrame(CSV.File(abspath("../tmp_data/elec_network_nodes.csv")))
-    elec_ac_lines = DataFrame(CSV.File(abspath("../tmp_data/elec_network_ac_lines.csv")))
+    elec_nodes = DataFrame(CSV.File(abspath("../input_data/elec_network_nodes.csv")))
+    elec_ac_lines = DataFrame(CSV.File(abspath("../input_data/elec_network_ac_lines.csv")))
     elec_ac_lines = elec_ac_lines[elec_ac_lines.voltage_level.>highVoltageThreshold,:] # only hv lines
-    elec_dc_lines = DataFrame(CSV.File(abspath("../tmp_data/elec_network_hvdc_lines.csv")))
-    elec_locations = DataFrame(CSV.File(abspath("../tmp_data/location.csv")))
+    elec_dc_lines = DataFrame(CSV.File(abspath("../input_data/elec_network_hvdc_lines.csv")))
+    elec_locations = DataFrame(CSV.File(abspath("../input_data/location.csv")))
     # join locations into elec_nodes
     elec_nodes = leftjoin(elec_nodes, elec_locations[:,["location_id", "location_name", "latitude", "longitude"]], on="location_id")
 

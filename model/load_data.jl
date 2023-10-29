@@ -8,7 +8,7 @@ using CSV, DataFrames
 
 
 function load_file_paths()
-    tmp_data_folder_path = rsplit(dirname(@__FILE__),"\\"; limit=2)[1] * "\\tmp_data\\"
+    input_data_folder_path = rsplit(dirname(@__FILE__),"\\"; limit=2)[1] * "\\input_data\\"
 
     FILE_PATHS = CSV.read(raw"FILE_PATHS.csv",DataFrame)
 
@@ -26,7 +26,7 @@ function load_file_paths()
     return_tuple = NamedTuple()
 
     for ct = collect(1:size(file_list)[1])
-        return_tuple = merge(return_tuple, [file_list[ct]=>string(tmp_data_folder_path * FILE_PATHS[ct,2]),])
+        return_tuple = merge(return_tuple, [file_list[ct]=>string(input_data_folder_path * FILE_PATHS[ct,2]),])
 
     end
 

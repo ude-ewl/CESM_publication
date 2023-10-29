@@ -1,26 +1,28 @@
-# activate the project
+# ======
+# === Setting up the environment
+# ======
 cd(dirname(@__FILE__))
 using Pkg
 
-Pkg.activate("model_plain_vanilla")
+# activate the julia environment given the informaiton in the Project.toml
+Pkg.activate(".") # this folder
+
+my_solver = "Gurobi" # "CPLEX"
 
 include("setup_functions.jl")
-if length(Pkg.installed()) == 0 # if no packages are in environment then install all packages as in Project.toml
-    # download all the libraries as in Manifest.toml
-    Pkg.instantiate()
-    add_additional_packages = "CPLEX"
-    setup_functions.add_additional_packages(add_additional_packages)
+if length(Pkg.installed()) == 0 
+    Pkg.instantiate() # download all the packages
+    setup_functions.add_additional_packages(my_solver) # Solvers must not only be installed, but also be built
+    Pkg.build("Plots")
 end 
+setup_functions.create_folders() # sanity check if "input_data" folder exists
 
-setup_functions.create_folders()
-
-
-# import the necessary packages
-using JuMP, XLSX, CSV, DataFrames, Setfield, LinearAlgebra, Dates, StatsBase
+# import the necessary packages for the main.jl script
+using Setfield
 
 
 # ======
-#-- Load choice file
+# === Load choice file
 # ======
 include("choice_file.jl")
 PARAMETER_SETTINGS = choice_file.input_parameter_settings();
@@ -30,7 +32,7 @@ model_chains.calling_solver_package(PARAMETER_SETTINGS)
 
 
 # ======
-# ==== load data
+# === load data
 # ======
 include("input_functions.jl")
 #-- load column definitions (names) for tables
@@ -44,10 +46,10 @@ INPUT = input_functions.fill_technology_structs(INPUT_RAW, COLUMN_DEFINITIONS, P
 # ======
 # ==== arbitrary input data manipulations to test the model
 # ======
-#INPUT = @set INPUT.RENEWABLES.TIMESERIES =  0.001 * INPUT.RENEWABLES.TIMESERIES; # Setfield workaround, as struct SET is principally immuable (for increased performance)
-#INPUT = @set INPUT.COMBINEDHEATPOWERS.PMAX =  0.001 * INPUT.COMBINEDHEATPOWERS.PMAX; # Setfield workaround, as struct SET is principally immuable (for increased performance)
+#INPUT = @set INPUT.RENEWABLES.TIMESERIES =  0.001 * INPUT.RENEWABLES.TIMESERIES;
+#INPUT = @set INPUT.COMBINEDHEATPOWERS.PMAX =  0.001 * INPUT.COMBINEDHEATPOWERS.PMAX;
 #INPUT = @set INPUT.CONVENTIONALS.FUEL_PRICE =  LinRange(50, 100, 205)
-INPUT = @set INPUT.BRANCHES.PMAX =  0.5 * INPUT.BRANCHES.PMAX
+#INPUT = @set INPUT.BRANCHES.PMAX =  0.5 * INPUT.BRANCHES.PMAX
 
 
 # ======
@@ -60,14 +62,14 @@ RESULTS_ALL = model_chains.rolling_optimization(INPUT, PARAMETER_SETTINGS)
 # ======
 # ==== save the results
 # ======
-what_to_save = Dict("aggregated_xlsx" => true, "detailed_csv" => false, "online_model" => false, "AoTRF" => false, "jld2" => false)
 include("output_save_functions.jl")
+what_to_save = Dict("aggregated_xlsx" => true, "detailed_csv" => false, "online_model" => false, "AoTRF" => false, "jld2" => false)
 output_save_functions.save_output_combination(RESULTS_ALL, INPUT, INPUT_RAW, COLUMN_DEFINITIONS, what_to_save, PARAMETER_SETTINGS)
 
 
 # ======
 # ==== plotting or results
 # ======
-what_to_plot = Dict("date" => "2023_02_11_15_55_44" , "LMP_aggregated" => false, "nodal_prices" => false, "line_loading"=>false)
 include("output_plot_functions.jl")
+what_to_plot = Dict("date" => "2023_10_29_19_24_14" , "LMP_aggregated" => true, "nodal_prices" => false, "line_loading"=>false)
 output_plot_functions.plot_selection(what_to_plot, INPUT, RESULTS_ALL, PARAMETER_SETTINGS)

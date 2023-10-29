@@ -1,10 +1,9 @@
 module output_save_functions
 
-using Dates, XLSX, DataFrames, StatsBase, CSV, JLD2
+using Dates, XLSX, DataFrames, CSV, StatsBase #, JLD2
 
 include("basic_functions.jl")
 include("choice_file.jl")
-
 
 
 function save_output_combination(RESULTS_ALL, MODEL_INPUT, INPUT, COLUMN_DEFINITIONS, input_dict, PARAMETER_SETTINGS)
@@ -38,15 +37,6 @@ function save_output_combination(RESULTS_ALL, MODEL_INPUT, INPUT, COLUMN_DEFINIT
 
     return nothing
 end
-
-
-
-
-
-
-
-
-
 
 
 #--- Save reults to Excel-file
@@ -859,6 +849,6 @@ function save_multiple_jld2(DATA, NAME)
     return nothing
 end
 
-#---
+
 end
 

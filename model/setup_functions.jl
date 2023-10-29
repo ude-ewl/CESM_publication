@@ -21,7 +21,7 @@ function create_folders()
 
     # check if data folders exist, else indicate what to do
     errorsum = 0
-    folderstring = rsplit(dirname(@__FILE__),"\\"; limit=2)[1] * "\\tmp_data"
+    folderstring = rsplit(dirname(@__FILE__),"\\"; limit=2)[1] * "\\input_data"
 
     if ~isdir(folderstring)
         mkdir(folderstring)
@@ -29,7 +29,7 @@ function create_folders()
     end
 
     if errorsum > 0
-        @assert(false, "Couldn't locate the folder " * folderstring * ". Execution is terminated as input data is missing. An empty folder was created at the right position. Please fill this folder with your input data.") 
+        @assert(false, "Couldn't locate the folder " * folderstring * ". Execution is terminated as input data is missing. An empty folder \"input_data\" was created. Please fill this folder with the input data.") 
     end
 end
 

@@ -1,6 +1,6 @@
 module input_functions
 
-using XLSX, CSV, DataFrames, MarketTechnicals, InteractiveUtils, Setfield, SparseArrays
+using XLSX, CSV, DataFrames, InteractiveUtils, Setfield, SparseArrays # MarketTechnicals
 
 include("basic_functions.jl")
 include("load_data.jl")
@@ -134,10 +134,10 @@ function load_input_data(COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
     IN_STORAGE = join_parameter_assignment(data_unit_parameters.el_storage_units, data_assignment.el_storage_units)
     # Filter only for considered storage units in relevant voltage levels
     IN_STORAGE = leftjoin(IN_STORAGE, data_elec_network.nodes[:,[:node_id, :voltage_id]], on=:node_id )
-    idx_relev_voltagelevel = map(in(Set(PARAMETER_SETTINGS.FLEXIBILITY_STORAGE_VOTLAGE_LEVELS)), IN_STORAGE.voltage_id)
+    idx_relev_voltagelevel = map(in(Set(PARAMETER_SETTINGS.FLEXIBILITY_STORAGE_VOLTAGE_LEVELS)), IN_STORAGE.voltage_id)
     idx_relev_battery = occursin.("_PS_", IN_STORAGE.unit_name)
     idx_relev = (idx_relev_voltagelevel .| idx_relev_battery)
-    println("Only consider STOR in voltage levels " * join(PARAMETER_SETTINGS.FLEXIBILITY_STORAGE_VOTLAGE_LEVELS, ", ") * " : From all " * string(size(idx_relev,1)) * " BS-STOR units will remain " * string(sum(idx_relev)) *  " STOR units.")
+    println("Only consider STOR in voltage levels " * join(PARAMETER_SETTINGS.FLEXIBILITY_STORAGE_VOLTAGE_LEVELS, ", ") * " : From all " * string(size(idx_relev,1)) * " BS-STOR units will remain " * string(sum(idx_relev)) *  " STOR units.")
     IN_STORAGE = IN_STORAGE[idx_relev,:]
     # Set self discharging ratio to 0.1 %
     IN_STORAGE.self_dis_ratio = ones(size(IN_STORAGE,1))*0.001
