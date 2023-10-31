@@ -1,6 +1,6 @@
 module input_functions
 
-using XLSX, CSV, DataFrames, InteractiveUtils, Setfield, SparseArrays # MarketTechnicals
+using XLSX, CSV, DataFrames, Setfield, SparseArrays
 
 include("basic_functions.jl")
 include("load_data.jl")
@@ -557,47 +557,8 @@ function fill_technology_structs(INPUT, COLUMN_DEFINITIONS, PARAMETER_SETTINGS)
         end
     end
 
-    # Scale down heat pump timeseries, smooth elecricity demand & scale down COP timeseries
-    # (This is not needed anymore since smoothing is done before Database...)
-    # MODEL_INPUT = preprocess_heat_pump_data(MODEL_INPUT)
-
     return MODEL_INPUT
 end
-
-function preprocess_heat_pump_data(MODEL_INPUT)
-    # Smoothing heat pump data
-    function smoothing_timeseries(in_timeseries)
-        # Number of timesteps used for smoothing
-        n = 5
-        # Shifting factor left and right
-        k = floor(n/2)
-        tmp_moving_average = sma(in_timeseries, n) # sma(test_input, n) # ema(test_input, 2, wilder=false)
-        out_timeseries = append!([in_timeseries[1] for i = 1 : k], tmp_moving_average, [in_timeseries[end] for i = 1 : n-k-1])
-        # # Scale down timeseries
-        # out_timeseries = out_timeseries * sum(in_timeseries) / sum(out_timeseries) * 75 / 281
-        return out_timeseries
-    end
-    # Smooth electricity timeseries
-    for col in 1 : size(MODEL_INPUT.HEATPUMPS.ELEC_TIMESERIES)[2]
-        MODEL_INPUT.HEATPUMPS.ELEC_TIMESERIES[:,col] = smoothing_timeseries(MODEL_INPUT.HEATPUMPS.ELEC_TIMESERIES[:,col])
-    end
-    # Smooth heat timeseries
-    for col in 1 : size(MODEL_INPUT.HEATPUMPS.ELEC_TIMESERIES)[2]
-        MODEL_INPUT.HEATPUMPS.HEAT_TIMESERIES[:,col] = smoothing_timeseries(MODEL_INPUT.HEATPUMPS.HEAT_TIMESERIES[:,col])
-    end
-    # # Scale down heat timeseries
-    # for col in 1 : size(MODEL_INPUT.HEATPUMPS.HEAT_TIMESERIES)[2]
-    #     MODEL_INPUT.HEATPUMPS.HEAT_TIMESERIES[:,col] = MODEL_INPUT.HEATPUMPS.HEAT_TIMESERIES[:,col] * 75 / 281
-    # end
-    # # Scale COP timeseries
-    # for col in 1 : size(MODEL_INPUT.HEATPUMPS.COP_TIMESERIES)[2]
-    #     tmp_mean_cop = sum(MODEL_INPUT.HEATPUMPS.COP_TIMESERIES[:,col]) / length(MODEL_INPUT.HEATPUMPS.COP_TIMESERIES[:,col])
-    #     MODEL_INPUT.HEATPUMPS.COP_TIMESERIES[:,col] = MODEL_INPUT.HEATPUMPS.COP_TIMESERIES[:,col] / tmp_mean_cop * 2.64
-    # end
-
-    return MODEL_INPUT
-end
-
 
 
 function load_input_test_data(TEST_DATA_DEFINITIONS, PARAMETER_SETTINGS)

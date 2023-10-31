@@ -42,6 +42,7 @@ INPUT_RAW = input_functions.load_input_data(COLUMN_DEFINITIONS, PARAMETER_SETTIN
 #--- Restructure model input (MI) data for model input
 INPUT = input_functions.fill_technology_structs(INPUT_RAW, COLUMN_DEFINITIONS, PARAMETER_SETTINGS);
 
+bahn.de/aktuell
 
 # ======
 # ==== arbitrary input data manipulations to test the model
@@ -63,13 +64,10 @@ RESULTS_ALL = model_chains.rolling_optimization(INPUT, PARAMETER_SETTINGS)
 # ==== save the results
 # ======
 include("output_save_functions.jl")
-what_to_save = Dict("aggregated_xlsx" => true, "detailed_csv" => false, "online_model" => false, "AoTRF" => false, "jld2" => false)
-output_save_functions.save_output_combination(RESULTS_ALL, INPUT, INPUT_RAW, COLUMN_DEFINITIONS, what_to_save, PARAMETER_SETTINGS)
-
+output_save_functions.save_aggregated_results_as_excel(RESULTS_ALL, INPUT, INPUT_RAW, PARAMETER_SETTINGS)
 
 # ======
 # ==== plotting or results
 # ======
 include("output_plot_functions.jl")
-what_to_plot = Dict("date" => "2023_10_29_19_24_14" , "LMP_aggregated" => true, "nodal_prices" => false, "line_loading"=>false)
-output_plot_functions.plot_selection(what_to_plot, INPUT, RESULTS_ALL, PARAMETER_SETTINGS)
+output_plot_functions.plot_lmp_aggregated(INPUT, RESULTS_ALL)
