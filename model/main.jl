@@ -42,8 +42,6 @@ INPUT_RAW = input_functions.load_input_data(COLUMN_DEFINITIONS, PARAMETER_SETTIN
 #--- Restructure model input (MI) data for model input
 INPUT = input_functions.fill_technology_structs(INPUT_RAW, COLUMN_DEFINITIONS, PARAMETER_SETTINGS);
 
-bahn.de/aktuell
-
 # ======
 # ==== arbitrary input data manipulations to test the model
 # ======

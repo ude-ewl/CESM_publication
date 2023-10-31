@@ -1,6 +1,6 @@
 module input_functions
 
-using XLSX, CSV, DataFrames, Setfield, SparseArrays
+using XLSX, CSV, DataFrames, Setfield, SparseArrays, InteractiveUtils 
 
 include("basic_functions.jl")
 include("load_data.jl")

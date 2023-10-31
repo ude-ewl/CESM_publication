@@ -7,56 +7,25 @@ include("choice_file.jl")
 
 
 
+#--- Save aggregated reults to Excel sheets
+function save_aggregated_results_as_excel(RESULTS_ALL, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
+    
+    OUT_TIMESERIES = preprocess_aggregated_output(RESULTS_ALL, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
+    OUT_OPTIMIZATION = preprocess_aggregated_OPTINFO(RESULTS_ALL, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
 
-#--- Save reults to Excel-file
-function save_results_as_excel_ffs(RESULTS)
-    # Define path and file name as string
+
+    # check if results folder exists, else create it
     str_folder = abspath(joinpath(pwd(), "../results"))
-    str_path = str_folder * "/" * Dates.format(now(), "yyyy_mm_dd_HH_MM_SS") * " - Output Rolling Optimization.xlsx"
-    XLSX.openxlsx(str_path, mode="w") do xf
-        for i in 1:length(RESULTS)
-            if i == 1
-                sheet = xf[1]
-                XLSX.rename!(sheet, String.(collect(keys(RESULTS)))[i])
-            else
-                sheet = XLSX.addsheet!(xf, String.(collect(keys(RESULTS)))[i])
-            end
-            sheet["A1"] = convert(Array, transpose(RESULTS[i]))
-        end
+    if !(isdir(str_folder))
+        mkdir(str_folder)
     end
-end
 
-function save_results_as_excel_ffs_2(RESULTS, NAME)
-    # Define path and file name as string
-    str_folder = abspath(joinpath(pwd(), "../results"))
-    str_path = str_folder * "/" * Dates.format(now(), "yyyy_mm_dd_HH_MM_SS") * "-" * NAME *".xlsx"
-    XLSX.openxlsx(str_path, mode="w") do xf
-        for i in 1:length(RESULTS)
-            if i == 1
-                sheet = xf[1]
-                XLSX.rename!(sheet, String.(collect(keys(RESULTS)))[i])
-            else
-                sheet = XLSX.addsheet!(xf, String.(collect(keys(RESULTS)))[i])
-            end
-            if typeof(RESULTS[i]) != Matrix{Union{Missing, Float64}}
-                sheet["A1"] = convert(Array, RESULTS[i])
-            else
-                sheet["A1"] = convert(Array, transpose(RESULTS[i]))
-            end
-        end
-    end
-end
+    # Save OVERVIEW on results in Excel sheet
+    str_file = string(str_folder *  "/" * Dates.format(now(), "yyyy_mm_dd_HH_MM_SS") * " - OVERVIEW on Output Rolling Optimization.xlsx")
+    XLSX.writetable(str_file, "Timeseries" => OUT_TIMESERIES, "Optimization" => OUT_OPTIMIZATION)
+    print("Saved results successfully - file: " * str_folder * "\n")
 
-#--- Function to detailed results as CSV files
-function save_detailed(IN_DF, col_names, time, sub_folder, file_name)
-    # Get column names
-    tmp_cols = broadcast(string,vcat("Timestep",col_names))
-    # Get data as matrix
-    tmp_mat = hcat(time, Matrix{Float64}(IN_DF))
-    # Create DataFrame
-    tmp_df = DataFrame(tmp_mat, tmp_cols)
-    # Save data to csv
-    CSV.write(sub_folder*"\\"*file_name*".csv", tmp_df)
+
 end
 
 #--- Save multiple matrices and vectors of the reults to Excel-file
@@ -99,6 +68,30 @@ function quantiles_results(MAT_RES, MAT_WEIGHT, TIME, WEIGHT)
     eval_res[:,5] = maximum(MAT_RES, dims = 1)'
 
     return eval_res
+end
+
+#--- Get quantiles of power flows accross AC lines
+function quantiles_line_loading(RESULTS, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
+    # Get index of timeseries input as temporary calc time
+    TMP_CALC_TIME = collect(1:length(PARAMETER_SETTINGS.CALC_TIME))
+    # Number of quantiles
+    N = 3
+    # Get set of AC lines
+    SET_AC_LINES = MODEL_INPUT.SETS.BRANCHES[size(INPUT.IN_TRAFOS,1)+1:end]
+    # Get absolute values of relative power flows, i.e. normalized using the rated power
+    ABS_FLOW_EL_LINE = broadcast(abs, RESULTS.FLOW_EL_BRANCH[SET_AC_LINES,:] ./ MODEL_INPUT.BRANCHES.PMAX[SET_AC_LINES])
+    # Initialize matrix for results of quantile analysis
+    QUANT_ABS_FLOW_EL_LINE = zeros(length(TMP_CALC_TIME),N+2)
+    # Get names of quantiles as string matrix for plot
+    quant_names = reshape([string(trunc(Int,q/(N+1)*100)) * " %" for q in 1:N],1,N)
+    # Get 1 % and 99 % quantiles
+    QUANT_ABS_FLOW_EL_LINE[:,1] = [quantile(ABS_FLOW_EL_LINE[:,t], 0.01) for t in TMP_CALC_TIME ]
+    QUANT_ABS_FLOW_EL_LINE[:,N+2] = [quantile(ABS_FLOW_EL_LINE[:,t], 0.99) for t in TMP_CALC_TIME ]
+    # For loop, to get quantile values
+    for q in 1:N
+        QUANT_ABS_FLOW_EL_LINE[:,q+1] = [quantile(ABS_FLOW_EL_LINE[:,t], q/(N+1)) for t in TMP_CALC_TIME ]
+    end
+    return QUANT_ABS_FLOW_EL_LINE
 end
 
 #--- Pre-process output
@@ -272,45 +265,27 @@ function preprocess_aggregated_output(RESULTS, MODEL_INPUT, INPUT, PARAMETER_SET
     return OUT_AGG_RES
 end
 
-#--- Save reults to Excel-file
-function save_aggregated_results_as_excel(RESULTS_ALL, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
+
+function preprocess_aggregated_OPTINFO(RESULTS, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
+
+    OUT_OPTIMIZIATION = DataFrame
+
+    MODELSTATUS = Vector{String}(RESULTS.MODELSTATUS)
+    OBJ_VAL = Vector{Float64}(RESULTS.OBJ_VAL)
+    SOLVE_TIME = Vector{Float64}(RESULTS.SOLVE_TIME)
     
-    OUT_AGG_RES = preprocess_aggregated_output(RESULTS_ALL, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
-    
-    # check if results folder exists, else create it
-    str_folder = abspath(joinpath(pwd(), "../results"))
-    if !(isdir(str_folder))
-        mkdir(str_folder)
-    end
-    # Save OVERVIEW on results in Excel
-    str_file = string(str_folder *  "/" * Dates.format(now(), "yyyy_mm_dd_HH_MM_SS") * " - OVERVIEW on Output Rolling Optimization.xlsx")
-    XLSX.writetable(str_file, OVERVIEW=( collect(DataFrames.eachcol(OUT_AGG_RES)), DataFrames.names(OUT_AGG_RES) ))
-    print("Saved AGGREGATED results successfully - file: " * str_folder * "\n")
-end
+    SLACK_EL_POS = Vector{Float64}(RESULTS.AGG_SLACK_EL_POS)
+    SLACK_EL_NEG = Vector{Float64}(RESULTS.AGG_SLACK_EL_NEG)
+    SLACK_HP = Vector{Float64}(RESULTS.AGG_SLACK_HP)
+    SLACK_Q = Vector{Float64}(RESULTS.AGG_SLACK_Q)
+ 
 
 
-#--- Get quantiles of power flows accross AC lines
-function quantiles_line_loading(RESULTS, MODEL_INPUT, INPUT, PARAMETER_SETTINGS)
-    # Get index of timeseries input as temporary calc time
-    TMP_CALC_TIME = collect(1:length(PARAMETER_SETTINGS.CALC_TIME))
-    # Number of quantiles
-    N = 3
-    # Get set of AC lines
-    SET_AC_LINES = MODEL_INPUT.SETS.BRANCHES[size(INPUT.IN_TRAFOS,1)+1:end]
-    # Get absolute values of relative power flows, i.e. normalized using the rated power
-    ABS_FLOW_EL_LINE = broadcast(abs, RESULTS.FLOW_EL_BRANCH[SET_AC_LINES,:] ./ MODEL_INPUT.BRANCHES.PMAX[SET_AC_LINES])
-    # Initialize matrix for results of quantile analysis
-    QUANT_ABS_FLOW_EL_LINE = zeros(length(TMP_CALC_TIME),N+2)
-    # Get names of quantiles as string matrix for plot
-    quant_names = reshape([string(trunc(Int,q/(N+1)*100)) * " %" for q in 1:N],1,N)
-    # Get 1 % and 99 % quantiles
-    QUANT_ABS_FLOW_EL_LINE[:,1] = [quantile(ABS_FLOW_EL_LINE[:,t], 0.01) for t in TMP_CALC_TIME ]
-    QUANT_ABS_FLOW_EL_LINE[:,N+2] = [quantile(ABS_FLOW_EL_LINE[:,t], 0.99) for t in TMP_CALC_TIME ]
-    # For loop, to get quantile values
-    for q in 1:N
-        QUANT_ABS_FLOW_EL_LINE[:,q+1] = [quantile(ABS_FLOW_EL_LINE[:,t], q/(N+1)) for t in TMP_CALC_TIME ]
-    end
-    return QUANT_ABS_FLOW_EL_LINE
+    OUT_OPTIMIZIATION = hcat(MODELSTATUS, OBJ_VAL, SOLVE_TIME, SLACK_EL_POS, SLACK_EL_NEG, SLACK_HP, SLACK_Q)
+    DF_SHEET = DataFrame(OUT_OPTIMIZIATION, :auto)
+    rename!(DF_SHEET,[:SOVLESTATUS,:OBJ_VAL,:SOLVE_TIME, :SLACK_EL_POS, :SLACK_EL_NEG, :SLACK_HP, :SLACK_Q]) # rename column names
+
+    return DF_SHEET
 end
 
 end
