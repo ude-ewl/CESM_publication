@@ -29,7 +29,7 @@ function create_folders()
     end
 
     if errorsum > 0
-        @assert(false, "Couldn't locate the folder " * folderstring * ". Execution is terminated as input data is missing. An empty folder \"input_data\" was created. Please fill this folder with the input data.") 
+        @assert(false, "An empty folder \"input_data\" was created. Please fill this folder with the input data.") 
     end
 end
 

@@ -12,9 +12,10 @@ The CESM model was established for the publication:
 
 
 # Requirements and Setup
-* ```Julia 1.6.7``` (long-term-support) Download the language [here](https://julialang.org/downloads/) or [here](https://julialang.org/downloads/oldreleases/).
+* ```Julia 1.6.7``` (long-term-support version). Download the language [here](https://julialang.org/downloads/) or [here](https://julialang.org/downloads/oldreleases/).
 * We recommend to use a proprietary solver. The model works with [CPLEX](https://www.ibm.com/products/ilog-cplex-optimization-studio/cplex-optimizer) or [Gurobi](https://www.gurobi.com/solutions/gurobi-optimizer/).
-* For the initial setup of the CESM, execute the ```main.jl``` file in the ```model``` folder. All relevant Julia packages then will be instantiated in the ```model``` environment.
+* For the initial setup of the CESM, go to the ```model``` folder. Select options in the ```choice_file.jl```, then execute the ```main.jl``` file. All relevant Julia packages then will be instantiated into a seperate Julia environment called ```model``` with its files Project.toml and Manifest.toml.
+* Only select your preferred features and/or few timesteps. The model otherwise requires prohibitive computation times. 
 
 
 # Additional data

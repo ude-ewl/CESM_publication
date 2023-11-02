@@ -14,6 +14,7 @@ if length(Pkg.installed()) == 0
     Pkg.instantiate() # download all the packages
     setup_functions.add_additional_packages(my_solver) # Solvers must not only be installed, but also be built
     Pkg.build("Plots")
+    Pkg.build("Setfield")
 end 
 setup_functions.create_folders() # sanity check if "input_data" folder exists
 
@@ -42,6 +43,7 @@ INPUT_RAW = input_functions.load_input_data(COLUMN_DEFINITIONS, PARAMETER_SETTIN
 #--- Restructure model input (MI) data for model input
 INPUT = input_functions.fill_technology_structs(INPUT_RAW, COLUMN_DEFINITIONS, PARAMETER_SETTINGS);
 
+
 # ======
 # ==== arbitrary input data manipulations to test the model
 # ======
@@ -69,3 +71,4 @@ output_save_functions.save_aggregated_results_as_excel(RESULTS_ALL, INPUT, INPUT
 # ======
 include("output_plot_functions.jl")
 output_plot_functions.plot_lmp_aggregated(INPUT, RESULTS_ALL)
+output_plot_functions.plot_generation_stack(INPUT, RESULTS_ALL)

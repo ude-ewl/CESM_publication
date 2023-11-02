@@ -2,11 +2,34 @@ module output_plot_functions
 
 using Plots
 using Statistics
+using StatsPlots
 
 
-function plot_dispatch(MODEL_INPUT, RESULTS_ALL)
+function plot_generation_stack(MODEL_INPUT, RESULTS_ALL)
 
     
+    data_matrix = vcat(
+        sum(RESULTS_ALL.RENEWABLE_FEED_IN,dims=1),    
+        sum(RESULTS_ALL.GEN_EL_ONLY,dims=1),
+        sum(RESULTS_ALL.GEN_EL_CHP,dims=1),
+        sum(RESULTS_ALL.GEN_HY_ROR,dims=1),
+        sum(RESULTS_ALL.GEN_EL_BIO,dims=1),
+    )
+
+
+    figure1 = groupedbar(data_matrix'./1e3,
+        bar_position = :stack,
+        bar_width=1,
+        color=permutedims(["green", "orange", "purple", "blue", "brown"]),
+        label=permutedims(["Wind & PV", "Gas", "CHP", "HY_ROR", "Biomass"]),
+        xlabel="Timesteps",
+        ylabel="Power in GW",
+        legend=:best
+        )
+    display(figure1)
+
+
+
 end
 
 
@@ -22,10 +45,12 @@ function plot_lmp_aggregated(MODEL_INPUT, RESULTS_ALL)
 
     data_vals = data_sorted[relevant_rows,:]'
 
-    bla = plot(data_vals, linetype=:steppre, labels=permutedims(cols_prices),legend=:best, title="LMP", ylabel="€/MWh", xlabel="hour")
-    display(bla)
+    figure2 = plot(data_vals, linetype=:steppre, legend=:best, labels=permutedims(cols_prices), 
+        title="Locational Marginal Prices", ylabel="Price in €/MWh", xlabel="Timesteps")
+    display(figure2)
 
 end
+
 
 end
 
