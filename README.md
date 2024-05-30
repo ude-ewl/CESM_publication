@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/687057711.svg)](https://zenodo.org/doi/10.5281/zenodo.11396393)
+
 # Cellular Energy System Model 
 This repo contains the Cellular Energy System Model (CESM). The model can be used to perform reserach on market design of decarbonized and decrentralized energy systems.
 The CESM model was established for the publication: 
@@ -18,7 +20,7 @@ The CESM model was established for the publication:
 
 
 # Additional data
-A simple dataset to test the model is available on Zenodo. Please, download the files. Create an ```input_data``` folder in your repo and paste the files there.
+A simple dataset to test the model is available. Please, ask the authors of the above mentioned publication. Place the files in the ```input_data``` folder in your repo.
 
 
 # Acknowledgements
