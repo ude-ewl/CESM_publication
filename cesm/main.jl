@@ -14,12 +14,8 @@ if length(Pkg.installed()) == 0
     Pkg.instantiate() # download all the packages
     setup_functions.add_additional_packages(my_solver) # Solvers must not only be installed, but also be built
     Pkg.build("Plots")
-    Pkg.build("Setfield")
 end 
 setup_functions.create_folders() # sanity check if "input_data" folder exists
-
-# import the necessary packages for the main.jl script
-using Setfield
 
 
 # ======
@@ -45,18 +41,8 @@ INPUT = input_functions.fill_technology_structs(INPUT_RAW, COLUMN_DEFINITIONS, P
 
 
 # ======
-# ==== arbitrary input data manipulations to test the model
-# ======
-#INPUT = @set INPUT.RENEWABLES.TIMESERIES =  0.001 * INPUT.RENEWABLES.TIMESERIES;
-#INPUT = @set INPUT.COMBINEDHEATPOWERS.PMAX =  0.001 * INPUT.COMBINEDHEATPOWERS.PMAX;
-#INPUT = @set INPUT.CONVENTIONALS.FUEL_PRICE =  LinRange(50, 100, 205)
-#INPUT = @set INPUT.BRANCHES.PMAX =  0.5 * INPUT.BRANCHES.PMAX
-
-
-# ======
 # ==== run the model
 # ======
-
 RESULTS_ALL = model_chains.rolling_optimization(INPUT, PARAMETER_SETTINGS)
 
 
@@ -71,4 +57,3 @@ output_save_functions.save_aggregated_results_as_excel(RESULTS_ALL, INPUT, INPUT
 # ======
 include("output_plot_functions.jl")
 output_plot_functions.plot_lmp_aggregated(INPUT, RESULTS_ALL)
-output_plot_functions.plot_generation_stack(INPUT, RESULTS_ALL)
